@@ -32,7 +32,23 @@ The modified version of this tool introduces the ability to brute-force the pass
 #### Example:
 
 ```bash
-SolarPuttyDecrypt.exe C:\Users\test\session.dat C:\path\to\rockyou.txt
+C:\Users\pc\Desktop\instant\SolarPuttyDecrypt\SolarPuttyDecrypt\bin\Release>.\SolarPuttyDecrypt.exe C:\Users\pc\Desktop\instant\SolarPuttyDecrypt\SolarPuttyDecrypt\bin\Release\sessions-backup.dat C:\Users\pc\Desktop\instant\SolarPuttyDecrypt\SolarPuttyDecrypt\bin\Release\rockyou.txt
+-----------------------------------------------------
+SolarPutty's Sessions Decrypter by VoidSec (Brute-Force by pointedsec)
+-----------------------------------------------------
+Trying password: 123456
+Error de desencriptación: Datos incorrectos.
+Trying password: 12345
+Error de desencriptación: Datos incorrectos.
+Trying password: 123456789
+Error de desencriptación: Datos incorrectos.
+Trying password: password
+Error de desencriptación: Datos incorrectos.
+......
+Trying password: estrella
+[+] Password found: estrella
+-----------------------------------------------------
+[+] DONE Decrypted file is saved in: C:\Users\pc\Desktop\SolarPutty_sessions_decrypted.txt
 ```
 
 The tool will iterate through the passwords in the file, trying each one against the session file until a valid password is found. Decrypted sessions will be output as before.
